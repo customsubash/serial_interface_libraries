@@ -1,0 +1,7 @@
+import spidev
+
+spi = spidev.SpiDev()
+spi.open(0, )
+spi.max_speed_hz = 1000000
+while(true):
+	spi.xfer([25])
