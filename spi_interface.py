@@ -18,7 +18,7 @@ packetcounter = 30
 # Repeatedly switch a MCP4151 digital pot off then on
 while True:
     spi.xfer([0x65])
-    data = spi.readbytes(2)
+    data = spi.readbytes(3)
     if data>0:
         print(data)
     #write_pot(0x1FF)
