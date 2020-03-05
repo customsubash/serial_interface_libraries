@@ -1,26 +1,55 @@
-#!/usr/bin/python
+
+
+#!/usr/bin/python3
 
 import spidev
 import time
 
 spi = spidev.SpiDev()
 spi.open(0, 0)
-spi.mode=0
-spi.max_speed_hz = 50000
+spi.no_cs=True
+spi.max_speed_hz = 1000000
+spi.mode = 0b01
 data=0;
+
 # Split an integer input into a two byte array to send via SPI
 def write_pot(input):
     msb = input >> 8
     lsb = input & 0xFF
     spi.xfer([msb, lsb])
 
-packetcounter = 30
+def get_data_on(addr):
+   spi.xfer([addr])
+   data=spi.xfer([addr])
+   return data
+
+def send_ins(data):
+    recv=[None]
+    data=ord(data)
+    while data!=recv[0]:
+        da = spi.xfer([data])
+        recv = spi.xfer([data])
+        print("Sent Data: ", data)
+        print("received data: ",recv)
+    return
+
+def send_char(data):
+    to_send = ord(data)
+    spi.xfer([to_send])
+    return
+
 # Repeatedly switch a MCP4151 digital pot off then on
 while True:
-    spi.xfer([0x65])
-    data = spi.readbytes(3)
-    if data>0:
-        print(data)
+    data = input("Enter the Instruction: ")
+    length = len(data)
+    if length==1:
+        send_char(data)
+        #data = ord(data) #Useed only for python3 since takes as char
+        ##recv = spi.xfer([data])
+        #recv = spi.writebytes([data])
+        #if not recv:
+        #    print("Sent Instruction: ",data)
+
     #write_pot(0x1FF)
     #time.sleep(0.5)
     #write_pot(0x00)
