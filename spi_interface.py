@@ -44,14 +44,3 @@ while True:
     length = len(data)
     if length==1:
         send_char(data)
-        #data = ord(data) #Useed only for python3 since takes as char
-        ##recv = spi.xfer([data])
-        #recv = spi.writebytes([data])
-        #if not recv:
-        #    print("Sent Instruction: ",data)
-
-    #write_pot(0x1FF)
-    #time.sleep(0.5)
-    #write_pot(0x00)
-    #time.sleep(0.5)
-    #print("hya")

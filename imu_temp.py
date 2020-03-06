@@ -29,10 +29,13 @@ to_rad = pi/180
 gyro_rate_adjust = 1 # not used
 acc_rate_adjust = 1  # not used
 
-alpha=0.05
+alpha=0.95
+acc_ref = 16834.0
+gyro_ref = 131.0
 
 gyro_angle=[0,0,0]
 prev_acc = [0,0,0]
+combined_angle = [0,0,0]
 
 gyro_offset_x,gyro_offset_y,gyro_offset_z=0,0,0
 
@@ -108,15 +111,16 @@ def read_raw_values():
 
 
 def normalize_data(acc_raw, gyro_raw):
+    global acc_ref, gyro_ref
     #normalize acc values
-    a_norm_x = acc_raw[0]/16834.0
-    a_norm_y = acc_raw[1]/16834.0
-    a_norm_z = acc_raw[2]/16834.0
+    a_norm_x = acc_raw[0]/acc_ref
+    a_norm_y = acc_raw[1]/acc_ref
+    a_norm_z = acc_raw[2]/acc_ref
 
     #normalize gyro values
-    g_norm_x = gyro_raw[0]/131.0
-    g_norm_y = gyro_raw[1]/131.0
-    g_norm_z = gyro_raw[2]/131.0
+    g_norm_x = gyro_raw[0]/gyro_ref
+    g_norm_y = gyro_raw[1]/gyro_ref
+    g_norm_z = gyro_raw[2]/gyro_ref
 
     return [a_norm_x, a_norm_y, a_norm_z], [g_norm_x, g_norm_y, g_norm_z]
 
@@ -142,7 +146,7 @@ def get_angle_acc(acc):
     try:
         acc_angle_x = m.atan2(acc[1], acc[2]) * to_deg
         acc_angle_y = m.atan2((-1*acc[0]), m.sqrt(acc[1]**2 + acc[2]**2)) * to_deg
-        acc_angle_z = 0
+        acc_angle_z = m.acos(acc[2] / m.sqrt(acc[0]**2 + acc[1]**2 + acc[2]**2)) * to_deg
     except Exception as e:
         pass
     
@@ -155,7 +159,7 @@ def get_alpha(prev_acc, acc):
     alpha_y = abs((prev_acc[1] - acc[1]))
     alpha_z = abs((prev_acc[2] - acc[2]))
     alpha = max(alpha_x, alpha_y, alpha_z)
-    if alpha>1:
+    if alpha > 1:
         alpha = 1
         
     return alpha
@@ -188,40 +192,52 @@ def get_position(prev_position, prev_velocity, dt):
     return [pos_x, pos_y, pos_z]
 
 
+
 def gravity_compensation(acc_norm, combined_angle):
-    x_acc_linear = acc_norm[0] - m.cos(combined_angle[1] * to_rad);      #16384 height latitude compensation
-    y_acc_linear = acc_norm[1] + m.sin(combined_angle[0] * to_rad);      #16384
-    z_acc_linear = acc_norm[2] + m.cos(combined_angle[2] * to_rad);      #16384
+    x_acc_linear = acc_norm[0] + m.sin(combined_angle[1] * to_rad);      #16384 height latitude compensation
+    y_acc_linear = acc_norm[1] - m.sin(combined_angle[0] * to_rad);      #16384
+    z_acc_linear = acc_norm[2] - m.cos(combined_angle[2] * to_rad);      #16384
     
     return [x_acc_linear, y_acc_linear, z_acc_linear]
 
 
 prev_velocity = [0,0,0]
+prev_velocity_raw = [0,0,0]
 prev_position = [0,0,0]
 def get_data(dt):
-    global gyro_angle, prev_acc, prev_velocity, prev_position
+    global gyro_angle, prev_acc, prev_velocity, prev_position, combined_angle
+    global alpha, prev_velocity_raw
     
+    gyro_angle = combined_angle
     acc_raw, gyro_raw = read_raw_values()
     acc_norm, gyro_norm = normalize_data(acc_raw, gyro_raw)
     
     acc_angle = get_angle_acc(acc_norm)
-        
+    #print("acc_angle",acc_angle)
     gyro_angle = get_angle_gyro(gyro_angle, gyro_norm, dt)
-    #print(gyro_angle)
+    #print("gyro_angle",gyro_angle)
 
-    alpha = get_alpha(prev_acc, acc_norm)
+    velocity_raw = get_velocity(prev_velocity_raw, acc_norm, dt)
+    prev_velocity_raw = velocity_raw
 
-    combined_angle = get_combined_angle(acc_angle, gyro_angle, alpha)
+    #alpha = get_alpha(prev_acc, acc_norm)
+    alpha = get_alpha(prev_velocity_raw, velocity_raw)
+    print alpha
     
-    acc_norm_compensated = gravity_compensation(acc_norm, combined_angle)
-    print("raw",acc_norm)
+    combined_angle = get_combined_angle(acc_angle, gyro_angle, alpha)
+    #print("Combined angle: ",combined_angle)
+    
+    angle_for_compensation = [combined_angle[0], combined_angle[1], acc_angle[2]]
+    print(angle_for_compensation)
+    acc_norm_compensated = gravity_compensation(acc_norm, angle_for_compensation)
+    print("Raw",acc_norm)
     print("Compensated",acc_norm_compensated)
     
     velocity = get_velocity(prev_velocity, acc_norm, dt)
-    #print("velocity: ",velocity)
+    #print("Velocity: ",velocity)
     
     position = get_position(prev_position, prev_velocity, dt)
-    #print("position: ",position)
+    #print("Position: ",position)
     print()
     
     prev_acc = acc_norm
