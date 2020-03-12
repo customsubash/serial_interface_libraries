@@ -110,19 +110,23 @@ def read_raw_values():
     return [acc_x_raw, acc_y_raw, acc_z_raw], [gyro_x, gyro_y, gyro_z]
 
 
-def normalize_data(acc_raw, gyro_raw):
-    global acc_ref, gyro_ref
+def normalize_acc_data(acc_raw):
+    global acc_ref
     #normalize acc values
     a_norm_x = acc_raw[0]/acc_ref
     a_norm_y = acc_raw[1]/acc_ref
     a_norm_z = acc_raw[2]/acc_ref
+    
+    return [a_norm_x, a_norm_y, a_norm_z]
 
+def normalize_gyro_data(gyro_raw):
+    global gyro_ref
     #normalize gyro values
     g_norm_x = gyro_raw[0]/gyro_ref
     g_norm_y = gyro_raw[1]/gyro_ref
     g_norm_z = gyro_raw[2]/gyro_ref
 
-    return [a_norm_x, a_norm_y, a_norm_z], [g_norm_x, g_norm_y, g_norm_z]
+    return [g_norm_x, g_norm_y, g_norm_z]
 
 
 def get_angle_gyro(gyro_angle, gyro, dt):
@@ -145,11 +149,11 @@ def get_median(acc_x, acc_y, acc_z):
 def get_angle_acc(acc):
     try:
         #acc_angle_x = m.atan2(acc[1], acc[2]) * to_deg
-        acc_angle_y = m.atan2((-1*acc[0]), m.sqrt(acc[1]**2 + acc[2]**2)) * to_deg
+        #acc_angle_y = m.atan2((-1*acc[0]), m.sqrt(acc[1]**2 + acc[2]**2)) * to_deg
+        #acc_angle_z = m.acos(acc[2] / m.sqrt(acc[0]**2 + acc[1]**2 + acc[2]**2)) * to_deg
+        acc_angle_x = m.asin(acc[1] / m.sqrt(acc[0]**2 + acc[1]**2 + acc[2]**2)) * to_deg
+        acc_angle_y = m.asin(-acc[0] / m.sqrt(acc[0]**2 + acc[1]**2 + acc[2]**2)) * to_deg
         acc_angle_z = m.acos(acc[2] / m.sqrt(acc[0]**2 + acc[1]**2 + acc[2]**2)) * to_deg
-        acc_angle_x = m.atan2(acc[1] , m.sqrt(acc[0]**2 + acc[1]**2 + acc[2]**2)) * to_deg
-        #acc_angle_y = m.atan2(-acc[0], m.sqrt(acc[0]**2 + acc[1]**2 + acc[2]**2)) * to_deg
-        #acc_angle_z = m.acos(acc[2] / m.sqrt(acc[0]**2 + acc[1]**2 + acc[2]**2))  * to_deg
     except Exception as e:
         pass
     
@@ -170,6 +174,7 @@ def get_alpha(prev_acc, acc):
 
 
 def get_combined_angle(acc_angle, gyro_angle, alpha):
+    print(alpha)
     combined_angle_x = alpha*gyro_angle[0] + (1-alpha)*acc_angle[0]
     combined_angle_y = alpha*gyro_angle[1] + (1-alpha)*acc_angle[1]
     combined_angle_z = gyro_angle[2]
@@ -208,43 +213,75 @@ def gravity_compensation(acc_norm, combined_angle):
 prev_velocity = [0,0,0]
 prev_velocity_raw = [0,0,0]
 prev_position = [0,0,0]
+acc_accumulation = []
+count = 0
+no_of_acc_samples = 10
 def get_data(dt):
     global gyro_angle, prev_acc, prev_velocity, prev_position, combined_angle
-    global alpha, prev_velocity_raw
+    global alpha, prev_velocity_raw, count, acc_accumulation, no_of_acc_samples
     
     gyro_angle = combined_angle
     acc_raw, gyro_raw = read_raw_values()
-    acc_norm, gyro_norm = normalize_data(acc_raw, gyro_raw)
+    
+    gyro_norm = normalize_gyro_data(gyro_raw)
+    acc_norm = normalize_acc_data(acc_raw)
     
     acc_angle = get_angle_acc(acc_norm)
-    print("acc_angle",acc_angle)
+    print("Accelerometer Angle:")
+    print("\tx: ",acc_angle[0])
+    print("\ty: ",acc_angle[1])
+    print("\tz: ",acc_angle[2])
 
     gyro_angle = get_angle_gyro(gyro_angle, gyro_norm, dt)
     #print("gyro_angle",gyro_angle)
+    print("Gyroscope Angle:")
+    print("\tx: ",gyro_angle[0])
+    print("\ty: ",gyro_angle[1])
+    print("\tz: ",gyro_angle[2])
 
     velocity_raw = get_velocity(prev_velocity_raw, acc_norm, dt)
 
     #alpha = get_alpha(prev_acc, acc_norm)
-    alpha = get_alpha(prev_velocity_raw, velocity_raw)
-    print(alpha)
-    
+    #alpha = get_alpha(prev_velocity_raw, velocity_raw)
+    print("Alpha: ",alpha)
     
     combined_angle = get_combined_angle(acc_angle, gyro_angle, alpha)
     #print("Combined angle: ",combined_angle)
     
     angle_for_compensation = [combined_angle[0], combined_angle[1], acc_angle[2]]
-    print(angle_for_compensation)
+    #print(angle_for_compensation)
+    print("Angle for Compensation:")
+    print("\tx: ",angle_for_compensation[0])
+    print("\ty: ",angle_for_compensation[1])
+    print("\tz: ",angle_for_compensation[2])
 
     acc_norm_compensated = gravity_compensation(acc_norm, angle_for_compensation)
-    print("Raw",acc_norm)
-    print("Compensated",acc_norm_compensated)
+    #print("Raw",acc_norm)
+    #print("Compensated",acc_norm_compensated)
+    print("Accelerometer Norm:")
+    print("\tx: ",acc_norm[0])
+    print("\ty: ",acc_norm[1])
+    print("\tz: ",acc_norm[2])
+
+    print("Compensated Accelerometer Normal:")
+    print("\tx: ",acc_norm_compensated[0])
+    print("\ty: ",acc_norm_compensated[1])
+    print("\tz: ",acc_norm_compensated[2])
     
-    velocity = get_velocity(prev_velocity, acc_norm, dt)
+    velocity = get_velocity(prev_velocity, acc_norm_compensated, dt)
     #print("Velocity: ",velocity)
+    print("Velocity:")
+    print("\tx: ",velocity[0])
+    print("\ty: ",velocity[1])
+    print("\tz: ",velocity[2])
     
     position = get_position(prev_position, prev_velocity, dt)
     #print("Position: ",position)
-    print()
+    print("position: ")
+    print("\tx: ",position[0])
+    print("\ty: ",position[1])
+    print("\tz: ",position[2])
+    print("")
 
     prev_velocity_raw = velocity_raw     
     prev_acc = acc_norm
