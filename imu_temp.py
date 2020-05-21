@@ -119,6 +119,7 @@ def normalize_acc_data(acc_raw):
     
     return [a_norm_x, a_norm_y, a_norm_z]
 
+
 def normalize_gyro_data(gyro_raw):
     global gyro_ref
     #normalize gyro values
@@ -199,7 +200,6 @@ def get_position(prev_position, prev_velocity, dt):
     pos_z = prev_position[2] + prev_velocity[2]*dt
     
     return [pos_x, pos_y, pos_z]
-
 
 
 def gravity_compensation(acc_norm, combined_angle):
